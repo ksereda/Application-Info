@@ -1,90 +1,100 @@
+## Application Info
 
-### Documentation
+### Get application version from Manifest file
+_____
 
-This is Query Performance application.
-______
+#### Start
 
-## Add/delete datasource
+1) First you need to write Groovy script for autoincrement your application version into `build.gradle` file:
 
-In this example, I used the `H2 Database`.
-All settings you can see in the `application.yml` file.
-
-In order to add/delete database, you must use the `application.yml` file.
-No need to make any additional settings.
-
-______
-
-
-### H2 Database
-
-Start H2.
-
-Go to http://127.0.0.1:8082 in your browser.
-
-Choose "Server" mode and connect to DB with this properties:
-
-    url: jdbc:h2:tcp://localhost/~/test
-    user: sa
-    password:
-    driverClassName: org.h2.Driver
-    
-    url: jdbc:h2:tcp://localhost/~/test2
-    user: sa
-    password:
-    driverClassName: org.h2.Driver
+        tasks.register("incrementVersion") {
+            doFirst {
+                def ver = version
+                println ver
+                String lastNumber = ver.substring(ver.lastIndexOf('.') + 1)
+                int increment = lastNumber.toInteger() + 1
+                println increment
         
-    url: jdbc:h2:tcp://localhost/~/test3
-    user: sa
-    password:
-    driverClassName: org.h2.Driver
+                String firstNumber = ver.substring(0, ver.lastIndexOf("."))
+                println firstNumber
+                String result = buildFile.getText().replaceFirst("version='$version'","version='" + firstNumber + "." + increment + "'")
+                buildFile.setText(result)
+            }
+        }
+        
+You must specify the dependence of your task `incrementVersion` in relation to the `build` gradle task.
+Those, when performing the `build` gradle task, your `incrementVersion` task will be executed first and thus the new value will be stored in your `build.gradle` file.
+       
+    jar.dependsOn incrementVersion
+    bootJar.dependsOn incrementVersion
+       
+or simply
 
+    build.dependsOn incrementVersion
+        
+Then you need to write what you need to display into your jar file in `MANIFEST.MF` file:
 
-## Create table
+    bootJar {
+        doFirst {
+            manifest {
+                attributes(
+                        'Main-Class': 'com.example.appinfo.AppinfoApplication',
+                        'Implementation-Title': 'Application Info project',
+                        'Implementation-Version': "${version}"
+                )
+            }
+        }
+    }         
+       
+Indicate your original version:
 
-CREATE TABLE users ( 
-   id INT NOT NULL,
-      name VARCHAR(50),
-      lastname VARCHAR(50),
-      email VARCHAR(50),
-      phone VARCHAR(50),
-      location VARCHAR(50),
-      address VARCHAR(50),
-      zipcode VARCHAR(50),
-      interests VARCHAR(50),
-      projectname VARCHAR(50),
-      PRIMARY KEY (id) 
-);
+    version='0.0.5'    
+    
+    
+2) Then you need to write backend logic to get this application version, when your jar file will be ready:
 
-## Insert data
+        public String getManifestInfo() {
+            return getClass().getPackage().getImplementationVersion();
+        }
+ 
+For example I created simple controller for check version.
 
-INSERT INTO users VALUES(1, 'Nick', 'Spenser', 'nickspens@gmail.com', '9876543210', 'MA', '177 Huntington Ave', '123123', 'hockey', 'SSA');
+_____
 
-INSERT INTO users VALUES(2, 'Tom', 'Love', 'tommy@gmail.com', '12345678', 'LA', '150 Str. Ave', '321654', 'hockey', 'Spotify');
+#### How to check
+- in terminal:
 
-INSERT INTO users VALUES(3, 'Valery', 'Simpson', 'vally@gmail.com', '989897676', 'ME', '11 Str. Sweet', '434343', 'baseball', 'Amazon');
+        gradle build
+        
+You can see your version will be increment.
 
+Your `MANIFEST` file will be on:
+    
+    /build/tmp/bootJar/MANIFEST.MF
 
-______
+Your jar file will be on:
 
-## Check work
-Check the work using `Postman`.
+    /build/libs/
 
-Send `POST` request with parameters:
+You can see my MANIFEST.MF file after creation new build:
 
-### Headers:
+    Manifest-Version: 1.0
+    Implementation-Title: Application Info project
+    Implementation-Version: 0.0.4
+    Start-Class: com.example.ApplicationInfo.ApplicationInfoApplication
+    Spring-Boot-Classes: BOOT-INF/classes/
+    Spring-Boot-Lib: BOOT-INF/lib/
+    Spring-Boot-Version: 2.1.6.RELEASE
+    Main-Class: com.example.appinfo.AppinfoApplication
+    
+Exactly the same file will be in your jar file.
 
-`Accept` - application/json
+- then start your jar file from command line
 
-`Content-Type` - application/json
+- go to `localhost:8080/info`
 
+You will see application version from `MANIFEST.MF` file from jar.
 
-### Body:
-
-`raw` - JSON(application/json)
-
-    {"query": "select * from users"}
-
-
-You can send a request through `Postman` and immediately send the same request through a `Rest client` (for example) to make sure that the second request will wait until the first request completes the work and receives the result.
-
-
+    NOTES:
+    
+    If you will repeat this operations you will see autoincrement application version (+1)
